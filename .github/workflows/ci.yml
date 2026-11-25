@@ -1,0 +1,92 @@
+name: CI (modules)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Which module to run (or 'all')"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - data_load
+          - data_quality_analysis
+          - data_research
+          - visualization
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  run-modules:
+    name: ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Ручний запуск з конкретним модулем -> матриця з одного модуля, інакше -> усі чотири
+        module: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.module != 'all' && format('["{0}"]', inputs.module) || '["data_load", "data_quality_analysis", "data_research", "visualization"]') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run module
+        shell: bash
+        env:
+          MODULE: ${{ matrix.module }}
+        run: |
+          # Модулі залежать один від одного, тому кожен job проганяє ланцюжок до свого модуля
+          case "$MODULE" in
+            data_load)             chain="data_load" ;;
+            data_quality_analysis) chain="data_load data_quality_analysis" ;;
+            data_research)         chain="data_load data_quality_analysis data_research" ;;
+            visualization)         chain="data_load data_quality_analysis visualization" ;;
+          esac
+
+          mkdir -p "artifacts/$MODULE"
+          for step in $chain; do
+            echo "===== python src/$step.py ====="
+            python "src/$step.py" || exit 1
+          done 2>&1 | tee "artifacts/$MODULE/run.log"
+
+      - name: Collect results
+        if: always()
+        shell: bash
+        env:
+          MODULE: ${{ matrix.module }}
+        run: |
+          out="artifacts/$MODULE"
+          case "$MODULE" in
+            data_load)             cp data/raw/dataset.csv "$out/" ;;
+            data_quality_analysis) cp data/processed/dataset_clean.csv "$out/" ;;
+            visualization)         cp reports/figures/*.png "$out/" ;;
+          esac || true
+          ls -la "$out"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.module }}
+          path: artifacts/${{ matrix.module }}
+          retention-days: 14
