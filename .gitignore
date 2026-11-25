@@ -19,3 +19,6 @@ data/processed/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# CI artifacts (logs, CSV, charts collected by GitHub Actions)
+artifacts/
