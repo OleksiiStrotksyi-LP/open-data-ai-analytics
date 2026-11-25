@@ -1,0 +1,71 @@
+name: CI (self-hosted)
+
+# Лише ручний запуск: репозиторій публічний, і чужий код не повинен
+# автоматично виконуватись на локальному ПК
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+  # Вивід українською без проблем з кодуванням консолі Windows
+  PYTHONUTF8: "1"
+
+jobs:
+  run-pipeline:
+    name: pipeline (self-hosted)
+    runs-on: [self-hosted, windows, local]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create virtual environment
+        shell: powershell
+        run: |
+          python --version
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\python.exe -m pip install -r requirements.txt
+
+      - name: Run pipeline
+        shell: python
+        run: |
+          import shutil
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          python = Path(".venv/Scripts/python.exe")
+          out = Path("artifacts/selfhosted")
+          out.mkdir(parents=True, exist_ok=True)
+
+          # Тут дані качаються з порталу напряму: для українського IP він доступний
+          modules = ["data_load", "data_quality_analysis", "data_research", "visualization"]
+          with open(out / "run.log", "w", encoding="utf-8") as log:
+              for module in modules:
+                  header = f"===== python src/{module}.py ====="
+                  result = subprocess.run(
+                      [str(python), f"src/{module}.py"],
+                      capture_output=True, text=True, encoding="utf-8",
+                  )
+                  output = f"{header}\n{result.stdout}{result.stderr}"
+                  print(output)
+                  log.write(output)
+                  if result.returncode != 0:
+                      sys.exit(result.returncode)
+
+          shutil.copy("data/raw/dataset.csv", out)
+          shutil.copy("data/processed/dataset_clean.csv", out)
+          for png in Path("reports/figures").glob("*.png"):
+              shutil.copy(png, out)
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-selfhosted
+          path: artifacts/selfhosted
+          retention-days: 14
