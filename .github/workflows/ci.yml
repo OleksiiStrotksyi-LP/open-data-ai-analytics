@@ -24,6 +24,9 @@ permissions:
 
 env:
   PYTHONUNBUFFERED: "1"
+  # Портал відкритих даних повертає 403 для серверів GitHub:
+  # у такому разі data_load бере резервну копію з data/fallback/
+  DATA_LOAD_FALLBACK: "1"
 
 jobs:
   run-modules:
