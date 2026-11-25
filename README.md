@@ -63,10 +63,13 @@ pip install -r requirements.txt
 
 ## Запуск
 
-Усі скрипти запускаються з кореня репозиторію при активованому `.venv`:
+Усі скрипти запускаються з кореня репозиторію при активованому `.venv`, саме в такому порядку:
 
 ```powershell
 python src/data_load.py
+python src/data_quality_analysis.py
+python src/data_research.py
+python src/visualization.py
 ```
 
 ## Структура проєкту
@@ -80,5 +83,7 @@ reports/figures/  графіки
 
 ## Модулі
 
-- `data_research` — перевіряє три гіпотези та будує модель логістичної регресії, що прогнозує наявність інтернету в укритті.
+- `data_load` — завантажує набір даних у `data/raw/`.
 - `data_quality_analysis` — перевіряє якість даних, уніфікує категорії та зберігає очищений набір у `data/processed/`.
+- `data_research` — перевіряє три гіпотези та будує модель логістичної регресії, що прогнозує наявність інтернету в укритті.
+- `visualization` — будує графіки для кожної гіпотези та зберігає їх у `reports/figures/`.
