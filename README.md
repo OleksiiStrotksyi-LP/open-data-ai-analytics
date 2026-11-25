@@ -77,3 +77,7 @@ notebooks/        Jupyter-ноутбуки для експериментів
 src/              код модулів
 reports/figures/  графіки
 ```
+
+## Модулі
+
+- `data_quality_analysis` — перевіряє якість даних, уніфікує категорії та зберігає очищений набір у `data/processed/`.
