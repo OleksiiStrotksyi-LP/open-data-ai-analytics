@@ -1,16 +1,18 @@
 """Модуль data_load: завантажує набір даних з data.gov.ua у data/raw/."""
 import csv
 import io
+import os
 import sys
 import zipfile
 
 import pandas as pd
 import requests
 
-from config import DATA_URL, RAW_DATA_PATH
+from config import DATA_URL, FALLBACK_DATA_PATH, RAW_DATA_PATH
 
 ENCODINGS = ("utf-8-sig", "cp1251")
 DELIMITERS = ";,\t|"
+FALLBACK_ENV = "DATA_LOAD_FALLBACK"
 
 
 def download(url: str) -> bytes:
@@ -30,6 +32,19 @@ def download(url: str) -> bytes:
 
     print(f"Отримано {len(content) / 1024:.1f} KB")
     return content
+
+
+def download_or_fallback(url: str) -> bytes:
+    """Завантажує дані; якщо портал недоступний і дозволено fallback, бере резервну копію."""
+    try:
+        return download(url)
+    except requests.RequestException as error:
+        if os.environ.get(FALLBACK_ENV) != "1" or not FALLBACK_DATA_PATH.exists():
+            raise
+        # Формат ::warning:: GitHub Actions показує як попередження в підсумку запуску
+        print(f"::warning::Портал недоступний ({error}). Використано резервну копію даних.")
+        print(f"Читання резервної копії: {FALLBACK_DATA_PATH}")
+        return FALLBACK_DATA_PATH.read_bytes()
 
 
 def decode(content: bytes) -> str:
@@ -59,7 +74,7 @@ def main() -> None:
     if DATA_URL.startswith("PASTE"):
         sys.exit("Вкажіть DATA_URL у src/config.py")
 
-    df = parse_csv(decode(download(DATA_URL)))
+    df = parse_csv(decode(download_or_fallback(DATA_URL)))
 
     # Зберігаємо без змін у даних, лише в єдиному форматі (UTF-8, кома)
     RAW_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
